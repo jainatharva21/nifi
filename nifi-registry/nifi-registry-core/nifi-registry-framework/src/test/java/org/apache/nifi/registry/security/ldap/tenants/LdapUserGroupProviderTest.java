@@ -16,6 +16,13 @@
  */
 package org.apache.nifi.registry.security.ldap.tenants;
 
+import org.apache.directory.server.annotations.CreateLdapServer;
+import org.apache.directory.server.annotations.CreateTransport;
+import org.apache.directory.server.core.annotations.ApplyLdifFiles;
+import org.apache.directory.server.core.annotations.CreateDS;
+import org.apache.directory.server.core.annotations.CreatePartition;
+import org.apache.directory.server.core.integ.AbstractLdapTestUnit;
+import org.apache.directory.server.core.integ.FrameworkRunner;
 import org.apache.nifi.registry.properties.NiFiRegistryProperties;
 import org.apache.nifi.registry.security.authorization.AuthorizerConfigurationContext;
 import org.apache.nifi.registry.security.authorization.Group;
@@ -27,13 +34,10 @@ import org.apache.nifi.registry.security.identity.IdentityMapper;
 import org.apache.nifi.registry.security.ldap.LdapAuthenticationStrategy;
 import org.apache.nifi.registry.security.ldap.ReferralStrategy;
 import org.apache.nifi.registry.util.StandardPropertyValue;
-import org.apache.nifi.remote.io.socket.NetworkUtils;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.mockito.Mockito;
-import org.springframework.context.support.GenericApplicationContext;
-import org.springframework.security.ldap.server.UnboundIdContainer;
 
 import java.util.Properties;
 import java.util.Set;
@@ -62,32 +66,28 @@ import static org.apache.nifi.registry.security.ldap.tenants.LdapUserGroupProvid
 import static org.apache.nifi.registry.security.ldap.tenants.LdapUserGroupProvider.PROP_USER_SEARCH_BASE;
 import static org.apache.nifi.registry.security.ldap.tenants.LdapUserGroupProvider.PROP_USER_SEARCH_FILTER;
 import static org.apache.nifi.registry.security.ldap.tenants.LdapUserGroupProvider.PROP_USER_SEARCH_SCOPE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-public class LdapUserGroupProviderTest{
+@RunWith(FrameworkRunner.class)
+@CreateLdapServer(transports = {@CreateTransport(protocol = "LDAP")})
+@CreateDS(name = "nifi-example", partitions = {@CreatePartition(name = "example", suffix = "o=nifi")})
+@ApplyLdifFiles("nifi-example.ldif")
+public class LdapUserGroupProviderTest extends AbstractLdapTestUnit {
 
     private static final String USER_SEARCH_BASE = "ou=users,o=nifi";
     private static final String GROUP_SEARCH_BASE = "ou=groups,o=nifi";
 
     private LdapUserGroupProvider ldapUserGroupProvider;
     private IdentityMapper identityMapper;
-    private Integer serverPort;
-    private UnboundIdContainer server;
 
-    @BeforeEach
+    @Before
     public void setup() {
-        server = new UnboundIdContainer("o=nifi", "classpath:nifi-example.ldif");
-        server.setApplicationContext(new GenericApplicationContext());
-        serverPort = NetworkUtils.availablePort();
-        server.setPort(serverPort);
-        server.afterPropertiesSet();
         final UserGroupProviderInitializationContext initializationContext = mock(UserGroupProviderInitializationContext.class);
         when(initializationContext.getIdentifier()).thenReturn("identifier");
 
@@ -96,12 +96,6 @@ public class LdapUserGroupProviderTest{
         ldapUserGroupProvider = new LdapUserGroupProvider();
         ldapUserGroupProvider.setIdentityMapper(identityMapper);
         ldapUserGroupProvider.initialize(initializationContext);
-    }
-    @AfterEach
-    public void shutdownLdapServer() {
-        if(server != null && server.isRunning()) {
-            server.destroy();
-        }
     }
 
     @Test(expected = SecurityProviderCreationException.class)
@@ -388,7 +382,7 @@ public class LdapUserGroupProviderTest{
     }
 
     @Test
-    public void testSearchUsersAndGroupsNoMembership() {
+    public void testSearchUsersAndGroupsNoMembership() throws Exception {
         final AuthorizerConfigurationContext configurationContext = getBaseConfiguration(USER_SEARCH_BASE, GROUP_SEARCH_BASE);
         ldapUserGroupProvider.onConfigured(configurationContext);
 
