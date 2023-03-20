@@ -382,7 +382,7 @@ public class LdapUserGroupProviderTest extends AbstractLdapTestUnit {
     }
 
     @Test
-    public void testSearchUsersAndGroupsNoMembership() throws Exception {
+    public void testSearchUsersAndGroupsNoMembership() {
         final AuthorizerConfigurationContext configurationContext = getBaseConfiguration(USER_SEARCH_BASE, GROUP_SEARCH_BASE);
         ldapUserGroupProvider.onConfigured(configurationContext);
 
