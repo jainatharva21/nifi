@@ -85,9 +85,16 @@ public class LdapUserGroupProviderTest extends AbstractLdapTestUnit {
 
     private LdapUserGroupProvider ldapUserGroupProvider;
     private IdentityMapper identityMapper;
+    private Integer serverPort;
+    private UnboundIdContainer server;
 
-    @Before
+    @BeforeEach
     public void setup() {
+        server = new UnboundIdContainer("o=nifi", "classpath:nifi-example.ldif");
+        server.setApplicationContext(new GenericApplicationContext());
+        serverPort = NetworkUtils.availablePort();
+        server.setPort(serverPort);
+        server.afterPropertiesSet();
         final UserGroupProviderInitializationContext initializationContext = mock(UserGroupProviderInitializationContext.class);
         when(initializationContext.getIdentifier()).thenReturn("identifier");
 
@@ -96,6 +103,13 @@ public class LdapUserGroupProviderTest extends AbstractLdapTestUnit {
         ldapUserGroupProvider = new LdapUserGroupProvider();
         ldapUserGroupProvider.setIdentityMapper(identityMapper);
         ldapUserGroupProvider.initialize(initializationContext);
+    }
+
+    @AfterEach
+    public void shutdownLdapServer() {
+        if(server != null && server.isRunning()) {
+            server.destroy();
+        }
     }
 
     @Test(expected = SecurityProviderCreationException.class)
