@@ -85,16 +85,9 @@ public class LdapUserGroupProviderTest extends AbstractLdapTestUnit {
 
     private LdapUserGroupProvider ldapUserGroupProvider;
     private IdentityMapper identityMapper;
-    private Integer serverPort;
-    private UnboundIdContainer server;
 
-    @BeforeEach
+    @Before
     public void setup() {
-        server = new UnboundIdContainer("o=nifi", "classpath:nifi-example.ldif");
-        server.setApplicationContext(new GenericApplicationContext());
-        serverPort = NetworkUtils.availablePort();
-        server.setPort(serverPort);
-        server.afterPropertiesSet();
         final UserGroupProviderInitializationContext initializationContext = mock(UserGroupProviderInitializationContext.class);
         when(initializationContext.getIdentifier()).thenReturn("identifier");
 
@@ -103,13 +96,6 @@ public class LdapUserGroupProviderTest extends AbstractLdapTestUnit {
         ldapUserGroupProvider = new LdapUserGroupProvider();
         ldapUserGroupProvider.setIdentityMapper(identityMapper);
         ldapUserGroupProvider.initialize(initializationContext);
-    }
-
-    @AfterEach
-    public void shutdownLdapServer() {
-        if(server != null && server.isRunning()) {
-            server.destroy();
-        }
     }
 
     @Test(expected = SecurityProviderCreationException.class)
@@ -396,7 +382,7 @@ public class LdapUserGroupProviderTest extends AbstractLdapTestUnit {
     }
 
     @Test
-    public void testSearchUsersAndGroupsNoMembership() {
+    public void testSearchUsersAndGroupsNoMembership() throws Exception {
         final AuthorizerConfigurationContext configurationContext = getBaseConfiguration(USER_SEARCH_BASE, GROUP_SEARCH_BASE);
         ldapUserGroupProvider.onConfigured(configurationContext);
 
