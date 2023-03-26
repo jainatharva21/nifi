@@ -73,11 +73,12 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.apache.nifi.remote.io.socket.NetworkUtils;
+import org.springframework.context.support.GenericApplicationContext;
+import org.springframework.security.ldap.server.UnboundIdContainer;
 
-@RunWith(FrameworkRunner.class)
-@CreateLdapServer(transports = {@CreateTransport(protocol = "LDAP")})
-@CreateDS(name = "nifi-example", partitions = {@CreatePartition(name = "example", suffix = "o=nifi")})
-@ApplyLdifFiles("nifi-example.ldif")
 public class LdapUserGroupProviderTest extends AbstractLdapTestUnit {
 
     private static final String USER_SEARCH_BASE = "ou=users,o=nifi";
@@ -85,9 +86,17 @@ public class LdapUserGroupProviderTest extends AbstractLdapTestUnit {
 
     private LdapUserGroupProvider ldapUserGroupProvider;
     private IdentityMapper identityMapper;
+    private Integer serverPort;
+    private UnboundIdContainer server;
 
-    @Before
+
+    @BeforeEach
     public void setup() {
+        server = new UnboundIdContainer("o=nifi", "classpath:nifi-example.ldif");
+        server.setApplicationContext(new GenericApplicationContext());
+        serverPort = NetworkUtils.availablePort();
+        server.setPort(serverPort);
+        server.afterPropertiesSet();
         final UserGroupProviderInitializationContext initializationContext = mock(UserGroupProviderInitializationContext.class);
         when(initializationContext.getIdentifier()).thenReturn("identifier");
 
@@ -96,6 +105,12 @@ public class LdapUserGroupProviderTest extends AbstractLdapTestUnit {
         ldapUserGroupProvider = new LdapUserGroupProvider();
         ldapUserGroupProvider.setIdentityMapper(identityMapper);
         ldapUserGroupProvider.initialize(initializationContext);
+    }
+    @AfterEach
+    public void shutdownLdapServer() {
+        if(server != null && server.isRunning()) {
+            server.destroy();
+        }
     }
 
     @Test(expected = SecurityProviderCreationException.class)
@@ -382,7 +397,7 @@ public class LdapUserGroupProviderTest extends AbstractLdapTestUnit {
     }
 
     @Test
-    public void testSearchUsersAndGroupsNoMembership() throws Exception {
+    public void testSearchUsersAndGroupsNoMembership() {
         final AuthorizerConfigurationContext configurationContext = getBaseConfiguration(USER_SEARCH_BASE, GROUP_SEARCH_BASE);
         ldapUserGroupProvider.onConfigured(configurationContext);
 
@@ -737,7 +752,7 @@ public class LdapUserGroupProviderTest extends AbstractLdapTestUnit {
 
     private AuthorizerConfigurationContext getBaseConfiguration(final String userSearchBase, final String groupSearchBase) {
         final AuthorizerConfigurationContext configurationContext = mock(AuthorizerConfigurationContext.class);
-        when(configurationContext.getProperty(PROP_URL)).thenReturn(new StandardPropertyValue("ldap://127.0.0.1:" + getLdapServer().getPort()));
+        when(configurationContext.getProperty(PROP_URL)).thenReturn(new StandardPropertyValue("ldap://127.0.0.1:" + serverPort));
         when(configurationContext.getProperty(PROP_CONNECT_TIMEOUT)).thenReturn(new StandardPropertyValue("30 secs"));
         when(configurationContext.getProperty(PROP_READ_TIMEOUT)).thenReturn(new StandardPropertyValue("30 secs"));
         when(configurationContext.getProperty(PROP_REFERRAL_STRATEGY)).thenReturn(new StandardPropertyValue(ReferralStrategy.FOLLOW.name()));
